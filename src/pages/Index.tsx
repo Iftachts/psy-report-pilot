@@ -21,38 +21,7 @@ interface Assessment {
 }
 
 const Index = () => {
-  const [children] = useState<Child[]>([
-    {
-      id: "1",
-      name: "שרה כהן",
-      dateOfBirth: "2015-03-15",
-      assessments: [
-        {
-          id: "a1",
-          childId: "1",
-          childName: "שרה כהן",
-          status: 'in-progress',
-          createdAt: "2024-01-15",
-          lastUpdated: "2024-01-20"
-        }
-      ]
-    },
-    {
-      id: "2", 
-      name: "דניאל לוי",
-      dateOfBirth: "2014-08-22",
-      assessments: [
-        {
-          id: "a2",
-          childId: "2",
-          childName: "דניאל לוי",
-          status: 'completed',
-          createdAt: "2024-01-10",
-          lastUpdated: "2024-01-18"
-        }
-      ]
-    }
-  ]);
+  const [children] = useState<Child[]>([]);
 
   const allAssessments = children.flatMap(child => child.assessments);
   const inProgressCount = allAssessments.filter(a => a.status === 'in-progress').length;
@@ -137,7 +106,7 @@ const Index = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">דוחות השבוע</p>
-                  <p className="text-2xl font-bold text-accent">3</p>
+                  <p className="text-2xl font-bold text-accent">0</p>
                 </div>
                 <FileText className="h-8 w-8 text-accent" />
               </div>

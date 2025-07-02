@@ -37,63 +37,16 @@ interface ReportData {
 const ReportGenerator = () => {
   const [reportData] = useState<ReportData>({
     child: {
-      name: "שרה כהן",
-      dateOfBirth: "15/03/2015",
-      age: 9
+      name: "",
+      dateOfBirth: "",
+      age: 0
     },
-    referralReason: "קשיים בלמידה ובריכוז",
-    assessmentDate: "20/01/2024",
-    psychologist: "ד\"ר רחל לוי",
-    scores: [
-      {
-        tool: "WISC-V",
-        subtest: "הבנה מילולית",
-        standardScore: 95,
-        scaleType: "S100",
-        notes: "ביצוע ברמה ממוצעת",
-        domain: "cognitive",
-        strength: true
-      },
-      {
-        tool: "WISC-V", 
-        subtest: "זיכרון עבודה",
-        standardScore: 78,
-        scaleType: "S100",
-        notes: "ביצוע מתחת לממוצע",
-        domain: "cognitive",
-        strength: false
-      },
-      {
-        tool: "מבחן קריאה",
-        subtest: "זיהוי מילים",
-        standardScore: 82,
-        scaleType: "S100",
-        notes: "קושי בזיהוי מילים מורכבות",
-        domain: "didactic",
-        strength: false
-      }
-    ],
-    observations: [
-      {
-        content: "הילדה הגיעה בזמן והראתה מוטיבציה טובה לשיתוף פעולה.",
-        timestamp: "20/01/2024 09:00"
-      },
-      {
-        content: "קושי בריכוז לאורך זמן, נדרשו הפסקות תכופות.",
-        timestamp: "20/01/2024 10:30"
-      },
-      {
-        content: "ביטחון עצמי נמוך במטלות אקדמיות.",
-        timestamp: "20/01/2024 11:15"
-      }
-    ],
-    recommendations: [
-      { title: "מתן זמן נוסף במבחנים" },
-      { title: "חלוקת מטלות למקטעים קצרים" },
-      { title: "מתן הפסקות תכופות" },
-      { title: "פיתוח אסטרטגיות למידה" },
-      { title: "חיזוק ביטחון עצמי אקדמי" }
-    ]
+    referralReason: "",
+    assessmentDate: "",
+    psychologist: "",
+    scores: [],
+    observations: [],
+    recommendations: []
   });
 
   const strengthsByDomain = {

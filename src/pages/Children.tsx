@@ -31,34 +31,7 @@ interface Child {
 }
 
 const Children = () => {
-  const [children, setChildren] = useState<Child[]>([
-    {
-      id: "1",
-      name: "שרה כהן",
-      dateOfBirth: "2015-03-15",
-      age: 9,
-      assessmentsCount: 2,
-      lastAssessment: "2024-01-20",
-      status: "active"
-    },
-    {
-      id: "2", 
-      name: "דניאל לוי",
-      dateOfBirth: "2014-08-22",
-      age: 9,
-      assessmentsCount: 1,
-      lastAssessment: "2024-01-18",
-      status: "completed"
-    },
-    {
-      id: "3",
-      name: "מיכל אברהם",
-      dateOfBirth: "2016-12-10",
-      age: 7,
-      assessmentsCount: 0,
-      status: "pending"
-    }
-  ]);
+  const [children, setChildren] = useState<Child[]>([]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

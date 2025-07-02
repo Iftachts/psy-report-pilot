@@ -172,8 +172,8 @@ const AssessmentForm = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-primary mb-2">טופס אבחון - שרה כהן</h1>
-          <p className="text-muted-foreground">תאריך לידה: 15/03/2015 | גיל: 9 שנים</p>
+          <h1 className="text-3xl font-bold text-primary mb-2">טופס אבחון חדש</h1>
+          <p className="text-muted-foreground">בחר ילד מהרשימה או הוסף ילד חדש כדי להתחיל אבחון</p>
         </div>
 
         <Tabs defaultValue="scores" className="w-full">
