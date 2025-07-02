@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ const commonRecommendations = [
 ];
 
 const AssessmentForm = () => {
+  const navigate = useNavigate();
   const [scores, setScores] = useState<Score[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(commonRecommendations);
@@ -467,7 +469,10 @@ const AssessmentForm = () => {
             <Save className="h-4 w-4 ml-2" />
             שמור טיוטה
           </Button>
-          <Button className="flex-1 bg-gradient-to-r from-primary to-secondary text-white">
+          <Button 
+            className="flex-1 bg-gradient-to-r from-primary to-secondary text-white"
+            onClick={() => navigate('/reports')}
+          >
             <FileText className="h-4 w-4 ml-2" />
             צור דו"ח
           </Button>
