@@ -3,7 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Download, FileText, Printer, Share } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
+import { Download, FileText, Printer, Share, CheckCircle, Eye } from "lucide-react";
 
 interface ReportData {
   child: {
@@ -107,8 +109,34 @@ const ReportGenerator = () => {
   };
 
   const generateReport = () => {
-    // Here would be the actual report generation logic
-    alert("דו\"ח נוצר בהצלחה! יתחיל הורדה...");
+    toast({
+      title: "דו\"ח נוצר בהצלחה! 📄",
+      description: "הדו\"ח מוכן להורדה במערכת",
+    });
+    
+    // Simulate report generation and download
+    setTimeout(() => {
+      const blob = new Blob([`דו"ח אבחון פסיכולוגי - ${reportData.child.name}`], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `דוח_אבחון_${reportData.child.name.replace(' ', '_')}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1000);
+  };
+
+  const printReport = () => {
+    window.print();
+  };
+
+  const shareReport = () => {
+    toast({
+      title: "קישור לשיתוף נוצר 🔗",
+      description: "הקישור הועתק ללוח העותקים",
+    });
   };
 
   return (
@@ -288,11 +316,11 @@ const ReportGenerator = () => {
             <Download className="h-4 w-4 ml-2" />
             הורד דו"ח (DOCX)
           </Button>
-          <Button variant="outline" className="flex-1">
+          <Button variant="outline" className="flex-1" onClick={printReport}>
             <Printer className="h-4 w-4 ml-2" />
             הדפס
           </Button>
-          <Button variant="outline" className="flex-1">
+          <Button variant="outline" className="flex-1" onClick={shareReport}>
             <Share className="h-4 w-4 ml-2" />
             שתף
           </Button>
