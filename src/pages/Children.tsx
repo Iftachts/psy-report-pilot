@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Plus, 
   Search, 
@@ -25,7 +27,14 @@ import { cn } from "@/lib/utils";
 interface Child {
   id: string;
   name: string;
-  dateOfBirth: string;
+  date_of_birth: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  notes?: string;
+}
+
+interface ChildWithCalculated extends Child {
   age: number;
   assessmentsCount: number;
   lastAssessment?: string;
@@ -33,8 +42,10 @@ interface Child {
 }
 
 const Children = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [children, setChildren] = useState<Child[]>([]);
+  const [children, setChildren] = useState<ChildWithCalculated[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -43,11 +54,46 @@ const Children = () => {
     dateOfBirth: undefined as Date | undefined
   });
 
+  useEffect(() => {
+    if (user) {
+      fetchChildren();
+    }
+  }, [user]);
+
+  const fetchChildren = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('children')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Transform data to include calculated fields
+      const transformedChildren: ChildWithCalculated[] = (data || []).map(child => ({
+        ...child,
+        age: calculateAge(new Date(child.date_of_birth)),
+        assessmentsCount: 0, // TODO: Get actual count from assessments table
+        status: 'pending' as const // TODO: Determine status based on assessments
+      }));
+      
+      setChildren(transformedChildren);
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת רשימת הילדים",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredChildren = children.filter(child =>
     child.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusBadge = (status: Child['status']) => {
+  const getStatusBadge = (status: ChildWithCalculated['status']) => {
     switch (status) {
       case 'active':
         return <Badge variant="default">פעיל</Badge>;
@@ -71,22 +117,45 @@ const Children = () => {
     return age;
   };
 
-  const addChild = () => {
-    if (!newChild.name || !newChild.dateOfBirth) return;
+  const addChild = async () => {
+    if (!newChild.name || !newChild.dateOfBirth || !user) return;
 
-    const age = calculateAge(newChild.dateOfBirth);
-    const child: Child = {
-      id: Date.now().toString(),
-      name: newChild.name,
-      dateOfBirth: format(newChild.dateOfBirth, "yyyy-MM-dd"),
-      age,
-      assessmentsCount: 0,
-      status: "pending"
-    };
+    try {
+      const { data, error } = await supabase
+        .from('children')
+        .insert({
+          name: newChild.name,
+          date_of_birth: format(newChild.dateOfBirth, "yyyy-MM-dd"),
+          user_id: user.id
+        })
+        .select()
+        .single();
 
-    setChildren([...children, child]);
-    setNewChild({ name: "", dateOfBirth: undefined });
-    setIsAddDialogOpen(false);
+      if (error) throw error;
+
+      // Add the new child to the local state
+      const newChildWithCalculated: ChildWithCalculated = {
+        ...data,
+        age: calculateAge(newChild.dateOfBirth),
+        assessmentsCount: 0,
+        status: 'pending'
+      };
+
+      setChildren([newChildWithCalculated, ...children]);
+      setNewChild({ name: "", dateOfBirth: undefined });
+      setIsAddDialogOpen(false);
+      
+      toast({
+        title: "הצלחה",
+        description: "הילד נוסף בהצלחה למערכת",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בהוספת הילד",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -251,7 +320,7 @@ const Children = () => {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
                       <span>גיל: {child.age} שנים</span>
-                      <span>תאריך לידה: {new Date(child.dateOfBirth).toLocaleDateString('he-IL')}</span>
+                      <span>תאריך לידה: {new Date(child.date_of_birth).toLocaleDateString('he-IL')}</span>
                       <span>מספר אבחונים: {child.assessmentsCount}</span>
                       {child.lastAssessment && (
                         <span>אבחון אחרון: {new Date(child.lastAssessment).toLocaleDateString('he-IL')}</span>
