@@ -231,7 +231,11 @@ const AssessmentForm = () => {
     
     const scoreValue = parseFloat(newScore.standardScore);
     if (!validateScore(scoreValue, newScore.scaleType)) {
-      alert(`ציון לא תקין עבור סולם ${newScore.scaleType}`);
+      toast({
+        title: "ציון לא תקין",
+        description: `הציון לא תקין עבור סולם ${newScore.scaleType}`,
+        variant: "destructive",
+      });
       return;
     }
 

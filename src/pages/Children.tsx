@@ -49,6 +49,8 @@ const Children = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingChild, setEditingChild] = useState<ChildWithCalculated | null>(null);
   const [newChild, setNewChild] = useState({
     name: "",
     dateOfBirth: undefined as Date | undefined
@@ -62,20 +64,54 @@ const Children = () => {
 
   const fetchChildren = async () => {
     try {
-      const { data, error } = await supabase
+      // Get children with their assessments count and status
+      const { data: childrenData, error: childrenError } = await supabase
         .from('children')
-        .select('*')
+        .select(`
+          *,
+          assessments (
+            id,
+            status,
+            created_at
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (childrenError) throw childrenError;
       
       // Transform data to include calculated fields
-      const transformedChildren: ChildWithCalculated[] = (data || []).map(child => ({
-        ...child,
-        age: calculateAge(new Date(child.date_of_birth)),
-        assessmentsCount: 0, // TODO: Get actual count from assessments table
-        status: 'pending' as const // TODO: Determine status based on assessments
-      }));
+      const transformedChildren: ChildWithCalculated[] = (childrenData || []).map(child => {
+        const assessments = child.assessments || [];
+        const assessmentsCount = assessments.length;
+        
+        // Determine status based on assessments
+        let status: 'active' | 'completed' | 'pending' = 'pending';
+        if (assessmentsCount > 0) {
+          const hasInProgress = assessments.some((a: any) => a.status === 'in-progress');
+          const hasCompleted = assessments.some((a: any) => a.status === 'completed');
+          
+          if (hasInProgress) {
+            status = 'active';
+          } else if (hasCompleted) {
+            status = 'completed';
+          }
+        }
+
+        // Find last assessment date
+        const lastAssessment = assessments.length > 0 
+          ? assessments.reduce((latest: any, current: any) => 
+              new Date(current.created_at || '') > new Date(latest.created_at || '') ? current : latest
+            ).created_at
+          : undefined;
+        
+        return {
+          ...child,
+          age: calculateAge(new Date(child.date_of_birth)),
+          assessmentsCount,
+          lastAssessment,
+          status
+        };
+      });
       
       setChildren(transformedChildren);
     } catch (error) {
@@ -158,6 +194,70 @@ const Children = () => {
     }
   };
 
+  const updateChild = async () => {
+    if (!editingChild || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('children')
+        .update({
+          name: editingChild.name,
+          date_of_birth: editingChild.date_of_birth
+        })
+        .eq('id', editingChild.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setChildren(prev => prev.map(child => 
+        child.id === editingChild.id 
+          ? { ...child, name: editingChild.name, date_of_birth: editingChild.date_of_birth }
+          : child
+      ));
+
+      setIsEditDialogOpen(false);
+      setEditingChild(null);
+      
+      toast({
+        title: "הצלחה",
+        description: "פרטי הילד עודכנו בהצלחה",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בעדכון פרטי הילד",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteChild = async (childId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('children')
+        .delete()
+        .eq('id', childId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setChildren(prev => prev.filter(child => child.id !== childId));
+      
+      toast({
+        title: "הצלחה",
+        description: "הילד נמחק מהמערכת",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה במחיקת הילד",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto">
@@ -234,6 +334,78 @@ const Children = () => {
                   <Button 
                     variant="outline" 
                     onClick={() => setIsAddDialogOpen(false)}
+                    className="flex-1"
+                  >
+                    ביטול
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Child Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent dir="rtl">
+              <DialogHeader>
+                <DialogTitle>עריכת פרטי ילד</DialogTitle>
+                <DialogDescription>
+                  ערוך את פרטי הילד במערכת
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-name">שם מלא</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingChild?.name || ""}
+                    onChange={(e) => setEditingChild(prev => prev ? {...prev, name: e.target.value} : null)}
+                    placeholder="שם פרטי ושם משפחה"
+                  />
+                </div>
+                
+                <div>
+                  <Label>תאריך לידה</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-right font-normal",
+                          !editingChild?.date_of_birth && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="ml-2 h-4 w-4" />
+                        {editingChild?.date_of_birth ? (
+                          format(new Date(editingChild.date_of_birth), "dd/MM/yyyy", { locale: he })
+                        ) : (
+                          <span>בחר תאריך לידה</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={editingChild?.date_of_birth ? new Date(editingChild.date_of_birth) : undefined}
+                        onSelect={(date) => setEditingChild(prev => 
+                          prev ? {...prev, date_of_birth: date ? format(date, "yyyy-MM-dd") : prev.date_of_birth} : null
+                        )}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("2000-01-01")
+                        }
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <Button onClick={updateChild} className="flex-1">
+                    שמור שינויים
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsEditDialogOpen(false)}
                     className="flex-1"
                   >
                     ביטול
@@ -332,11 +504,8 @@ const Children = () => {
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        // TODO: Implement edit child functionality
-                        toast({
-                          title: "בפיתוח",
-                          description: "עריכת פרטי ילד תהיה זמינה בקרוב",
-                        });
+                        setEditingChild(child);
+                        setIsEditDialogOpen(true);
                       }}
                     >
                       <Edit className="h-4 w-4 ml-1" />
@@ -348,19 +517,40 @@ const Children = () => {
                         אבחון חדש
                       </Button>
                     </Link>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        // TODO: Implement more options
-                        toast({
-                          title: "בפיתוח",
-                          description: "אפשרויות נוספות יהיו זמינות בקרוב",
-                        });
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-40" align="end">
+                        <div className="space-y-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              navigator.clipboard.writeText(child.id);
+                              toast({
+                                title: "הועתק",
+                                description: "מזהה הילד הועתק ללוח",
+                              });
+                            }}
+                          >
+                            העתק מזהה
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-destructive"
+                            onClick={() => deleteChild(child.id)}
+                          >
+                            <Trash2 className="h-4 w-4 ml-1" />
+                            מחק ילד
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               ))}
