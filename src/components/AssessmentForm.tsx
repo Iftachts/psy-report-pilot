@@ -36,6 +36,23 @@ interface Recommendation {
   selected: boolean;
 }
 
+interface CHCAbility {
+  id: string;
+  code: string;
+  name: string;
+  hebrewName: string;
+  description: string;
+}
+
+interface XBATest {
+  id: string;
+  abilityId: string;
+  testName: string;
+  subtest: string;
+  standardScore: number;
+  notes: string;
+}
+
 const diagnosticTools = [
   "WISC-V",
   "WAIS-IV", 
@@ -68,6 +85,73 @@ const commonRecommendations = [
   { id: "10", title: "טיפול באמצעות משחק", selected: false }
 ];
 
+const chcAbilities: CHCAbility[] = [
+  {
+    id: "gf",
+    code: "Gf",
+    name: "Fluid Intelligence",
+    hebrewName: "אינטליגנציה נוזלית",
+    description: "יכולת להשתמש בהיגיון כדי לפתור בעיות חדשות ולהבין קשרים"
+  },
+  {
+    id: "gc",
+    code: "Gc",
+    name: "Crystallized Intelligence",
+    hebrewName: "אינטליגנציה גבישית",
+    description: "ידע נרכש ומיומנויות מילוליות"
+  },
+  {
+    id: "gv",
+    code: "Gv",
+    name: "Visual Processing",
+    hebrewName: "עיבוד חזותי",
+    description: "יכולת לתפוס, לנתח ולחשוב באמצעות דפוסים חזותיים"
+  },
+  {
+    id: "ga",
+    code: "Ga",
+    name: "Auditory Processing",
+    hebrewName: "עיבוד שמיעתי",
+    description: "יכולת לנתח ולסנתז מידע שמיעתי"
+  },
+  {
+    id: "gs",
+    code: "Gs",
+    name: "Processing Speed",
+    hebrewName: "מהירות עיבוד",
+    description: "יכולת לביצוע מהיר של משימות קוגניטיביות אוטומטיות"
+  },
+  {
+    id: "gsm",
+    code: "Gsm",
+    name: "Short-term Memory",
+    hebrewName: "זיכרון קצר מדי",
+    description: "יכולת לשמור ולתפעל מידע בזיכרון לזמן קצר"
+  },
+  {
+    id: "glr",
+    code: "Glr",
+    name: "Long-term Retrieval",
+    hebrewName: "שליפה מזיכרון ארוך מדי",
+    description: "יכולת לאחסן ולשלוף מידע מהזיכרון ארוך המדי"
+  },
+  {
+    id: "gq",
+    code: "Gq",
+    name: "Quantitative Knowledge",
+    hebrewName: "ידע כמותי",
+    description: "ידע מתמטי ויכולת לפתור בעיות מתמטיות"
+  },
+  {
+    id: "grw",
+    code: "Grw",
+    name: "Reading/Writing",
+    hebrewName: "קריאה וכתיבה",
+    description: "מיומנויות בסיסיות בקריאה וכתיבה"
+  }
+];
+
+
 const AssessmentForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -95,6 +179,20 @@ const AssessmentForm = () => {
   });
   const [newObservation, setNewObservation] = useState("");
   const [customRecommendation, setCustomRecommendation] = useState("");
+  const [xbaTests, setXbaTests] = useState<XBATest[]>([]);
+  const [newXbaTest, setNewXbaTest] = useState<{
+    abilityId: string;
+    testName: string;
+    subtest: string;
+    standardScore: string;
+    notes: string;
+  }>({
+    abilityId: "",
+    testName: "",
+    subtest: "",
+    standardScore: "",
+    notes: ""
+  });
 
   useEffect(() => {
     if (user) {
@@ -340,6 +438,43 @@ const AssessmentForm = () => {
     ));
   };
 
+  const addXbaTest = () => {
+    if (!newXbaTest.abilityId || !newXbaTest.testName || !newXbaTest.standardScore) return;
+    
+    const scoreValue = parseFloat(newXbaTest.standardScore);
+    if (scoreValue < 40 || scoreValue > 160) {
+      toast({
+        title: "ציון לא תקין",
+        description: "הציון חייב להיות בין 40 ל-160",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const xbaTest: XBATest = {
+      id: Date.now().toString(),
+      abilityId: newXbaTest.abilityId,
+      testName: newXbaTest.testName,
+      subtest: newXbaTest.subtest,
+      standardScore: scoreValue,
+      notes: newXbaTest.notes
+    };
+
+    setXbaTests([...xbaTests, xbaTest]);
+    setNewXbaTest({
+      abilityId: "",
+      testName: "",
+      subtest: "",
+      standardScore: "",
+      notes: ""
+    });
+  };
+
+  const getAbilityById = (id: string) => chcAbilities.find(ability => ability.id === id);
+
+  const getTestsByAbility = (abilityId: string) => 
+    xbaTests.filter(test => test.abilityId === abilityId);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto">
@@ -372,8 +507,9 @@ const AssessmentForm = () => {
         </Card>
 
         <Tabs defaultValue="scores" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="scores">ציוני אבחון</TabsTrigger>
+            <TabsTrigger value="xba">ניתוח XBA</TabsTrigger>
             <TabsTrigger value="observations">יומן תצפיות</TabsTrigger>
             <TabsTrigger value="domains">תיוג תחומים</TabsTrigger>
             <TabsTrigger value="recommendations">המלצות</TabsTrigger>
@@ -490,6 +626,119 @@ const AssessmentForm = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* XBA Analysis Tab */}
+          <TabsContent value="xba" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>ניתוח XBA - יכולות CHC</CardTitle>
+                <CardDescription>
+                  בחר יכולת CHC והוסף מבחנים הרלוונטיים אליה
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="chc-ability">יכולת CHC</Label>
+                    <Select value={newXbaTest.abilityId} onValueChange={(value) => setNewXbaTest({...newXbaTest, abilityId: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="בחר יכולת CHC" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {chcAbilities.map((ability) => (
+                          <SelectItem key={ability.id} value={ability.id}>
+                            {ability.code} - {ability.hebrewName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="test-name">שם המבחן</Label>
+                    <Input
+                      id="test-name"
+                      value={newXbaTest.testName}
+                      onChange={(e) => setNewXbaTest({...newXbaTest, testName: e.target.value})}
+                      placeholder="שם המבחן"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="xba-score">ציון סטנדרטי</Label>
+                    <Input
+                      id="xba-score"
+                      type="number"
+                      value={newXbaTest.standardScore}
+                      onChange={(e) => setNewXbaTest({...newXbaTest, standardScore: e.target.value})}
+                      placeholder="40-160"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="xba-subtest">תת-מבחן</Label>
+                  <Input
+                    id="xba-subtest"
+                    value={newXbaTest.subtest}
+                    onChange={(e) => setNewXbaTest({...newXbaTest, subtest: e.target.value})}
+                    placeholder="שם התת-מבחן (אופציונלי)"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="xba-notes">הערות</Label>
+                  <Textarea
+                    id="xba-notes"
+                    value={newXbaTest.notes}
+                    onChange={(e) => setNewXbaTest({...newXbaTest, notes: e.target.value})}
+                    placeholder="הערות על הביצוע..."
+                    rows={2}
+                  />
+                </div>
+
+                <Button onClick={addXbaTest} className="w-full">
+                  <Plus className="h-4 w-4 ml-2" />
+                  הוסף מבחן ליכולת CHC
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* CHC Abilities Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {chcAbilities.map((ability) => {
+                const abilityTests = getTestsByAbility(ability.id);
+                return (
+                  <Card key={ability.id} className={abilityTests.length > 0 ? "border-primary" : ""}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        <span>{ability.code} - {ability.hebrewName}</span>
+                        {abilityTests.length > 0 && (
+                          <Badge variant="secondary">{abilityTests.length}</Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {ability.description}
+                      </CardDescription>
+                    </CardHeader>
+                    {abilityTests.length > 0 && (
+                      <CardContent>
+                        <div className="space-y-2">
+                          {abilityTests.map((test) => (
+                            <div key={test.id} className="p-2 bg-muted/50 rounded text-sm">
+                              <div className="font-medium">{test.testName}</div>
+                              {test.subtest && <div className="text-muted-foreground">{test.subtest}</div>}
+                              <div className="text-primary font-bold">ציון: {test.standardScore}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           </TabsContent>
 
           {/* Observations Tab */}
