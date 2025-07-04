@@ -91,7 +91,7 @@ const Index = () => {
                   ילד חדש
                 </Button>
               </Link>
-              <Link to="/children">
+              <Link to="/assessment">
                 <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
                   <Plus className="h-4 w-4 ml-2" />
                   אבחון חדש
@@ -180,14 +180,18 @@ const Index = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      עריכה
-                    </Button>
-                    {assessment.status === 'completed' && (
-                      <Button variant="secondary" size="sm">
-                        <FileText className="h-4 w-4 ml-1" />
-                        דו"ח
+                    <Link to="/assessment">
+                      <Button variant="outline" size="sm">
+                        עריכה
                       </Button>
+                    </Link>
+                    {assessment.status === 'completed' && (
+                      <Link to="/reports">
+                        <Button variant="secondary" size="sm">
+                          <FileText className="h-4 w-4 ml-1" />
+                          דו"ח
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -199,10 +203,12 @@ const Index = () => {
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-foreground mb-2">אין אבחונים עדיין</h3>
                 <p className="text-muted-foreground mb-4">התחל על ידי יצירת אבחון חדש</p>
-                <Button className="bg-gradient-to-r from-primary to-secondary text-white">
-                  <Plus className="h-4 w-4 ml-2" />
-                  צור אבחון חדש
-                </Button>
+                <Link to="/assessment">
+                  <Button className="bg-gradient-to-r from-primary to-secondary text-white">
+                    <Plus className="h-4 w-4 ml-2" />
+                    צור אבחון חדש
+                  </Button>
+                </Link>
               </div>
             )}
           </CardContent>

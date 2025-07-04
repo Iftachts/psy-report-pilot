@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import { 
   Plus, 
   Search, 
@@ -31,6 +33,7 @@ interface Child {
 }
 
 const Children = () => {
+  const { toast } = useToast();
   const [children, setChildren] = useState<Child[]>([]);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -256,15 +259,37 @@ const Children = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        // TODO: Implement edit child functionality
+                        toast({
+                          title: "בפיתוח",
+                          description: "עריכת פרטי ילד תהיה זמינה בקרוב",
+                        });
+                      }}
+                    >
                       <Edit className="h-4 w-4 ml-1" />
                       עריכה
                     </Button>
-                    <Button variant="secondary" size="sm">
-                      <FileText className="h-4 w-4 ml-1" />
-                      אבחון חדש
-                    </Button>
-                    <Button variant="ghost" size="sm">
+                    <Link to="/assessment">
+                      <Button variant="secondary" size="sm">
+                        <FileText className="h-4 w-4 ml-1" />
+                        אבחון חדש
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        // TODO: Implement more options
+                        toast({
+                          title: "בפיתוח",
+                          description: "אפשרויות נוספות יהיו זמינות בקרוב",
+                        });
+                      }}
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </div>
