@@ -44,9 +44,13 @@ interface CHCAbility {
   description: string;
 }
 
-interface ScoreCHCMapping {
-  scoreId: string;
+interface XBATest {
+  id: string;
   abilityId: string;
+  testName: string;
+  subtest: string;
+  standardScore: number;
+  notes: string;
 }
 
 const diagnosticTools = [
@@ -175,7 +179,20 @@ const AssessmentForm = () => {
   });
   const [newObservation, setNewObservation] = useState("");
   const [customRecommendation, setCustomRecommendation] = useState("");
-  const [scoreCHCMappings, setScoreCHCMappings] = useState<ScoreCHCMapping[]>([]);
+  const [xbaTests, setXbaTests] = useState<XBATest[]>([]);
+  const [newXbaTest, setNewXbaTest] = useState<{
+    abilityId: string;
+    testName: string;
+    subtest: string;
+    standardScore: string;
+    notes: string;
+  }>({
+    abilityId: "",
+    testName: "",
+    subtest: "",
+    standardScore: "",
+    notes: ""
+  });
 
   useEffect(() => {
     if (user) {
@@ -222,7 +239,6 @@ const AssessmentForm = () => {
           const assessmentData = JSON.parse(data.assessment_data);
           setScores(assessmentData.scores || []);
           setObservations(assessmentData.observations || []);
-          setScoreCHCMappings(assessmentData.scoreCHCMappings || []);
           
           if (assessmentData.recommendations) {
             setRecommendations(prev => 
@@ -256,13 +272,12 @@ const AssessmentForm = () => {
     setLoading(true);
     try {
       const selectedChildData = children.find(c => c.id === selectedChild);
-        const assessmentData = JSON.stringify({
-          scores,
-          observations,
-          recommendations: recommendations.filter(r => r.selected),
-          scoreCHCMappings,
-          savedAt: new Date().toISOString()
-        });
+      const assessmentData = JSON.stringify({
+        scores,
+        observations,
+        recommendations: recommendations.filter(r => r.selected),
+        savedAt: new Date().toISOString()
+      });
 
       if (assessmentId) {
         // Update existing assessment
@@ -423,32 +438,42 @@ const AssessmentForm = () => {
     ));
   };
 
-  const assignScoreToCHC = (scoreId: string, abilityId: string) => {
-    const existingMapping = scoreCHCMappings.find(m => m.scoreId === scoreId);
-    if (existingMapping) {
-      setScoreCHCMappings(mappings => 
-        mappings.map(m => m.scoreId === scoreId ? { ...m, abilityId } : m)
-      );
-    } else {
-      setScoreCHCMappings(mappings => [...mappings, { scoreId, abilityId }]);
+  const addXbaTest = () => {
+    if (!newXbaTest.abilityId || !newXbaTest.testName || !newXbaTest.standardScore) return;
+    
+    const scoreValue = parseFloat(newXbaTest.standardScore);
+    if (scoreValue < 40 || scoreValue > 160) {
+      toast({
+        title: "ציון לא תקין",
+        description: "הציון חייב להיות בין 40 ל-160",
+        variant: "destructive",
+      });
+      return;
     }
+
+    const xbaTest: XBATest = {
+      id: Date.now().toString(),
+      abilityId: newXbaTest.abilityId,
+      testName: newXbaTest.testName,
+      subtest: newXbaTest.subtest,
+      standardScore: scoreValue,
+      notes: newXbaTest.notes
+    };
+
+    setXbaTests([...xbaTests, xbaTest]);
+    setNewXbaTest({
+      abilityId: "",
+      testName: "",
+      subtest: "",
+      standardScore: "",
+      notes: ""
+    });
   };
 
-  const removeScoreFromCHC = (scoreId: string) => {
-    setScoreCHCMappings(mappings => mappings.filter(m => m.scoreId !== scoreId));
-  };
+  const getAbilityById = (id: string) => chcAbilities.find(ability => ability.id === id);
 
-  const getScoresByAbility = (abilityId: string) => {
-    const mappedScoreIds = scoreCHCMappings
-      .filter(m => m.abilityId === abilityId)
-      .map(m => m.scoreId);
-    return scores.filter(score => mappedScoreIds.includes(score.id));
-  };
-
-  const getAbilityForScore = (scoreId: string) => {
-    const mapping = scoreCHCMappings.find(m => m.scoreId === scoreId);
-    return mapping ? mapping.abilityId : null;
-  };
+  const getTestsByAbility = (abilityId: string) => 
+    xbaTests.filter(test => test.abilityId === abilityId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 p-6" dir="rtl">
@@ -605,108 +630,115 @@ const AssessmentForm = () => {
 
           {/* XBA Analysis Tab */}
           <TabsContent value="xba" className="space-y-6">
-            {scores.length === 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>ניתוח XBA - שיוך ציונים ליכולות CHC</CardTitle>
-                  <CardDescription>
-                    לא נמצאו ציונים לשיוך. אנא הזן ציונים בלשונית "ציוני אבחון" תחילה.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-center py-8">
-                  <p className="text-muted-foreground">אין ציונים זמינים לשיוך</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>שיוך ציונים ליכולות CHC</CardTitle>
-                    <CardDescription>
-                      שייך כל ציון ליכולת CHC המתאימה עבור ניתוח XBA
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {scores.map((score) => {
-                        const currentAbility = getAbilityForScore(score.id);
-                        return (
-                          <div key={score.id} className="p-4 border rounded-lg">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <span className="font-medium">{score.tool}</span>
-                                {score.subtest && <span className="text-muted-foreground"> - {score.subtest}</span>}
-                                <span className="text-primary font-bold"> (ציון: {score.standardScore})</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <Label className="text-sm font-medium w-20">יכולת CHC:</Label>
-                              <Select
-                                value={currentAbility || ""}
-                                onValueChange={(value) => {
-                                  if (value) {
-                                    assignScoreToCHC(score.id, value);
-                                  } else {
-                                    removeScoreFromCHC(score.id);
-                                  }
-                                }}
-                              >
-                                <SelectTrigger className="w-64">
-                                  <SelectValue placeholder="בחר יכולת CHC..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">ללא שיוך</SelectItem>
-                                  {chcAbilities.map((ability) => (
-                                    <SelectItem key={ability.id} value={ability.id}>
-                                      {ability.code} - {ability.hebrewName}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* CHC Abilities Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>ניתוח XBA - יכולות CHC</CardTitle>
+                <CardDescription>
+                  בחר יכולת CHC והוסף מבחנים הרלוונטיים אליה
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {chcAbilities.map((ability) => {
-                    const abilityScores = getScoresByAbility(ability.id);
-                    return (
-                      <Card key={ability.id} className={abilityScores.length > 0 ? "border-primary" : ""}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-lg flex items-center justify-between">
-                            <span>{ability.code} - {ability.hebrewName}</span>
-                            {abilityScores.length > 0 && (
-                              <Badge variant="secondary">{abilityScores.length}</Badge>
-                            )}
-                          </CardTitle>
-                          <CardDescription className="text-sm">
-                            {ability.description}
-                          </CardDescription>
-                        </CardHeader>
-                        {abilityScores.length > 0 && (
-                          <CardContent>
-                            <div className="space-y-2">
-                              {abilityScores.map((score) => (
-                                <div key={score.id} className="p-2 bg-muted/50 rounded text-sm">
-                                  <div className="font-medium">{score.tool}</div>
-                                  {score.subtest && <div className="text-muted-foreground">{score.subtest}</div>}
-                                  <div className="text-primary font-bold">ציון: {score.standardScore}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        )}
-                      </Card>
-                    );
-                  })}
+                  <div>
+                    <Label htmlFor="chc-ability">יכולת CHC</Label>
+                    <Select value={newXbaTest.abilityId} onValueChange={(value) => setNewXbaTest({...newXbaTest, abilityId: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="בחר יכולת CHC" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {chcAbilities.map((ability) => (
+                          <SelectItem key={ability.id} value={ability.id}>
+                            {ability.code} - {ability.hebrewName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="test-name">שם המבחן</Label>
+                    <Input
+                      id="test-name"
+                      value={newXbaTest.testName}
+                      onChange={(e) => setNewXbaTest({...newXbaTest, testName: e.target.value})}
+                      placeholder="שם המבחן"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="xba-score">ציון סטנדרטי</Label>
+                    <Input
+                      id="xba-score"
+                      type="number"
+                      value={newXbaTest.standardScore}
+                      onChange={(e) => setNewXbaTest({...newXbaTest, standardScore: e.target.value})}
+                      placeholder="40-160"
+                    />
+                  </div>
                 </div>
-              </>
-            )}
+
+                <div>
+                  <Label htmlFor="xba-subtest">תת-מבחן</Label>
+                  <Input
+                    id="xba-subtest"
+                    value={newXbaTest.subtest}
+                    onChange={(e) => setNewXbaTest({...newXbaTest, subtest: e.target.value})}
+                    placeholder="שם התת-מבחן (אופציונלי)"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="xba-notes">הערות</Label>
+                  <Textarea
+                    id="xba-notes"
+                    value={newXbaTest.notes}
+                    onChange={(e) => setNewXbaTest({...newXbaTest, notes: e.target.value})}
+                    placeholder="הערות על הביצוע..."
+                    rows={2}
+                  />
+                </div>
+
+                <Button onClick={addXbaTest} className="w-full">
+                  <Plus className="h-4 w-4 ml-2" />
+                  הוסף מבחן ליכולת CHC
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* CHC Abilities Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {chcAbilities.map((ability) => {
+                const abilityTests = getTestsByAbility(ability.id);
+                return (
+                  <Card key={ability.id} className={abilityTests.length > 0 ? "border-primary" : ""}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        <span>{ability.code} - {ability.hebrewName}</span>
+                        {abilityTests.length > 0 && (
+                          <Badge variant="secondary">{abilityTests.length}</Badge>
+                        )}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {ability.description}
+                      </CardDescription>
+                    </CardHeader>
+                    {abilityTests.length > 0 && (
+                      <CardContent>
+                        <div className="space-y-2">
+                          {abilityTests.map((test) => (
+                            <div key={test.id} className="p-2 bg-muted/50 rounded text-sm">
+                              <div className="font-medium">{test.testName}</div>
+                              {test.subtest && <div className="text-muted-foreground">{test.subtest}</div>}
+                              <div className="text-primary font-bold">ציון: {test.standardScore}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           </TabsContent>
 
           {/* Observations Tab */}
