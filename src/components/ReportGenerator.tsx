@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -35,7 +38,8 @@ interface ReportData {
 }
 
 const ReportGenerator = () => {
-  const [reportData] = useState<ReportData>({
+  const { user } = useAuth();
+  const [reportData, setReportData] = useState<ReportData>({
     child: {
       name: "",
       dateOfBirth: "",
@@ -48,6 +52,99 @@ const ReportGenerator = () => {
     observations: [],
     recommendations: []
   });
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [selectedAssessment, setSelectedAssessment] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchCompletedAssessments();
+    }
+  }, [user]);
+
+  const fetchCompletedAssessments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('assessments')
+        .select(`
+          *,
+          children (
+            name,
+            date_of_birth
+          )
+        `)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAssessments(data || []);
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת האבחונים",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAssessmentData = (assessmentId: string) => {
+    const assessment = assessments.find(a => a.id === assessmentId);
+    if (!assessment) return;
+
+    const child = assessment.children;
+    let parsedAssessmentData: any = {};
+    
+    try {
+      parsedAssessmentData = JSON.parse(assessment.assessment_data || '{}');
+    } catch (error) {
+      console.error('Error parsing assessment data:', error);
+      parsedAssessmentData = {};
+    }
+    
+    setReportData({
+      child: {
+        name: child?.name || assessment.child_name,
+        dateOfBirth: child?.date_of_birth || "",
+        age: child?.date_of_birth ? Math.floor((new Date().getTime() - new Date(child.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365)) : 0
+      },
+      referralReason: "הפניה לאבחון פסיכולוגי חינוכי",
+      assessmentDate: new Date(assessment.created_at).toLocaleDateString('he-IL'),
+      psychologist: "פסיכולוג/ית חינוכי/ת",
+      scores: parsedAssessmentData.scores || [],
+      observations: parsedAssessmentData.observations || [],
+      recommendations: parsedAssessmentData.recommendations || []
+    });
+  };
+
+  const saveReport = async () => {
+    if (!selectedAssessment || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('reports')
+        .insert({
+          assessment_id: selectedAssessment,
+          child_name: reportData.child.name,
+          user_id: user.id,
+          report_content: JSON.stringify(reportData)
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "דו\"ח נשמר",
+        description: "הדו\"ח נשמר בהצלחה במערכת",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בשמירת הדו\"ח",
+        variant: "destructive",
+      });
+    }
+  };
 
   const strengthsByDomain = {
     cognitive: reportData.scores.filter(s => s.domain === 'cognitive' && s.strength),
@@ -61,15 +158,39 @@ const ReportGenerator = () => {
     emotional: reportData.scores.filter(s => s.domain === 'emotional' && !s.strength)
   };
 
-  const generateReport = () => {
+  const generateReport = async () => {
+    await saveReport();
+    
     toast({
       title: "דו\"ח נוצר בהצלחה! 📄",
       description: "הדו\"ח מוכן להורדה במערכת",
     });
     
-    // Simulate report generation and download
+    // Generate and download report
     setTimeout(() => {
-      const blob = new Blob([`דו"ח אבחון פסיכולוגי - ${reportData.child.name}`], { type: 'text/plain' });
+      const reportContent = `
+דו"ח אבחון פסיכולוגי חינוכי-דידקטי
+
+פרטי הנבדק/ת:
+שם: ${reportData.child.name}
+תאריך לידה: ${reportData.child.dateOfBirth}
+גיל: ${reportData.child.age} שנים
+תאריך אבחון: ${reportData.assessmentDate}
+
+תוצאות האבחון:
+${reportData.scores.map(score => `${score.tool} - ${score.subtest}: ${score.standardScore} (${score.scaleType})`).join('\n')}
+
+תצפיות התנהגותיות:
+${reportData.observations.map(obs => obs.content).join('\n')}
+
+המלצות להתאמות לימוד:
+${reportData.recommendations.map(rec => `• ${rec.title}`).join('\n')}
+
+בברכה,
+${reportData.psychologist}
+      `;
+      
+      const blob = new Blob([reportContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -101,7 +222,33 @@ const ReportGenerator = () => {
           <p className="text-muted-foreground">תאריך יצירה: {new Date().toLocaleDateString('he-IL')}</p>
         </div>
 
+        {/* Assessment Selection */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>בחירת אבחון</CardTitle>
+            <CardDescription>בחר אבחון שהושלם כדי לייצר דו"ח</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedAssessment} onValueChange={(value) => {
+              setSelectedAssessment(value);
+              loadAssessmentData(value);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="בחר אבחון..." />
+              </SelectTrigger>
+              <SelectContent>
+                {assessments.map((assessment) => (
+                  <SelectItem key={assessment.id} value={assessment.id}>
+                    {assessment.child_name} - {new Date(assessment.created_at).toLocaleDateString('he-IL')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         {/* Report Preview */}
+        {selectedAssessment && (
         <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
           {/* Report Header */}
           <div className="text-center mb-8">
@@ -262,8 +409,10 @@ const ReportGenerator = () => {
             </p>
           </div>
         </div>
+        )}
 
         {/* Action Buttons */}
+        {selectedAssessment && (
         <div className="flex gap-4">
           <Button onClick={generateReport} className="flex-1 bg-gradient-to-r from-primary to-secondary text-white">
             <Download className="h-4 w-4 ml-2" />
@@ -278,6 +427,7 @@ const ReportGenerator = () => {
             שתף
           </Button>
         </div>
+        )}
       </div>
     </div>
   );

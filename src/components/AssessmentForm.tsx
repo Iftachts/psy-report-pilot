@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,9 +70,15 @@ const commonRecommendations = [
 
 const AssessmentForm = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [scores, setScores] = useState<Score[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(commonRecommendations);
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChild, setSelectedChild] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const [newScore, setNewScore] = useState<{
     tool: string;
     subtest: string;
@@ -85,6 +94,124 @@ const AssessmentForm = () => {
   });
   const [newObservation, setNewObservation] = useState("");
   const [customRecommendation, setCustomRecommendation] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      fetchChildren();
+    }
+  }, [user]);
+
+  const fetchChildren = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('children')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setChildren(data || []);
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת רשימת הילדים",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const saveAssessment = async () => {
+    if (!selectedChild || !user) {
+      toast({
+        title: "שגיאה",
+        description: "אנא בחר ילד לפני שמירת האבחון",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const selectedChildData = children.find(c => c.id === selectedChild);
+      const assessmentData = JSON.stringify({
+        scores,
+        observations,
+        recommendations: recommendations.filter(r => r.selected),
+        savedAt: new Date().toISOString()
+      });
+
+      if (assessmentId) {
+        // Update existing assessment
+        const { error } = await supabase
+          .from('assessments')
+          .update({
+            assessment_data: assessmentData,
+            status: 'in-progress'
+          })
+          .eq('id', assessmentId);
+
+        if (error) throw error;
+      } else {
+        // Create new assessment
+        const { data, error } = await supabase
+          .from('assessments')
+          .insert({
+            child_id: selectedChild,
+            child_name: selectedChildData?.name || '',
+            user_id: user.id,
+            assessment_data: assessmentData,
+            status: 'in-progress'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        setAssessmentId(data.id);
+      }
+
+      toast({
+        title: "נשמר בהצלחה",
+        description: "האבחון נשמר במערכת",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בשמירת האבחון",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeAssessment = async () => {
+    if (!assessmentId) {
+      await saveAssessment();
+    }
+
+    if (assessmentId) {
+      try {
+        const { error } = await supabase
+          .from('assessments')
+          .update({ status: 'completed' })
+          .eq('id', assessmentId);
+
+        if (error) throw error;
+
+        toast({
+          title: "האבחון הושלם",
+          description: "האבחון הועבר לסטטוס 'הושלם' ועכשיו ניתן לייצר דוח",
+        });
+        
+        navigate('/reports');
+      } catch (error) {
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בסיום האבחון",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   const validateScore = (score: number, scale: string): boolean => {
     switch (scale) {
@@ -175,6 +302,28 @@ const AssessmentForm = () => {
           <h1 className="text-3xl font-bold text-primary mb-2">טופס אבחון חדש</h1>
           <p className="text-muted-foreground">בחר ילד מהרשימה או הוסף ילד חדש כדי להתחיל אבחון</p>
         </div>
+
+        {/* Child Selection */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>בחירת ילד</CardTitle>
+            <CardDescription>בחר ילד מהרשימה כדי להתחיל אבחון</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedChild} onValueChange={setSelectedChild}>
+              <SelectTrigger>
+                <SelectValue placeholder="בחר ילד..." />
+              </SelectTrigger>
+              <SelectContent>
+                {children.map((child) => (
+                  <SelectItem key={child.id} value={child.id}>
+                    {child.name} (גיל {Math.floor((new Date().getTime() - new Date(child.date_of_birth).getTime()) / (1000 * 60 * 60 * 24 * 365))})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="scores" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
@@ -464,17 +613,29 @@ const AssessmentForm = () => {
         </Tabs>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 mt-8">
-          <Button variant="outline" className="flex-1">
-            <Save className="h-4 w-4 ml-2" />
-            שמור טיוטה
+        <div className="flex gap-4 mt-6">
+          <Button
+            onClick={() => navigate('/children')}
+            variant="outline"
+            className="flex-1"
+          >
+            חזור לרשימת ילדים
           </Button>
-          <Button 
+          <Button
+            onClick={saveAssessment}
+            disabled={loading || !selectedChild}
             className="flex-1 bg-gradient-to-r from-primary to-secondary text-white"
-            onClick={() => navigate('/reports')}
+          >
+            <Save className="h-4 w-4 ml-2" />
+            {loading ? "שומר..." : "שמור אבחון"}
+          </Button>
+          <Button
+            onClick={completeAssessment}
+            disabled={loading || !selectedChild}
+            className="flex-1 bg-gradient-to-r from-success to-info text-white"
           >
             <FileText className="h-4 w-4 ml-2" />
-            צור דו"ח
+            סיים ויצור דו"ח
           </Button>
         </div>
       </div>
