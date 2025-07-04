@@ -1,31 +1,67 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, FileText, Users, BarChart3, Clock, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 
 interface Child {
   id: string;
   name: string;
-  dateOfBirth: string;
-  assessments: Assessment[];
+  date_of_birth: string;
+  created_at: string;
 }
 
 interface Assessment {
   id: string;
-  childId: string;
-  childName: string;
+  child_id: string;
+  child_name: string;
   status: 'draft' | 'in-progress' | 'completed';
-  createdAt: string;
-  lastUpdated: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const Index = () => {
-  const [children] = useState<Child[]>([]);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [children, setChildren] = useState<Child[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const allAssessments = children.flatMap(child => child.assessments);
-  const inProgressCount = allAssessments.filter(a => a.status === 'in-progress').length;
-  const completedCount = allAssessments.filter(a => a.status === 'completed').length;
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  const fetchData = async () => {
+    try {
+      const [childrenResponse, assessmentsResponse] = await Promise.all([
+        supabase.from('children').select('*').order('created_at', { ascending: false }),
+        supabase.from('assessments').select('*').order('created_at', { ascending: false })
+      ]);
+
+      if (childrenResponse.error) throw childrenResponse.error;
+      if (assessmentsResponse.error) throw assessmentsResponse.error;
+
+      setChildren(childrenResponse.data || []);
+      setAssessments(assessmentsResponse.data || []);
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת הנתונים",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inProgressCount = assessments.filter(a => a.status === 'in-progress').length;
+  const completedCount = assessments.filter(a => a.status === 'completed').length;
 
   const getStatusBadge = (status: Assessment['status']) => {
     switch (status) {
@@ -49,14 +85,18 @@ const Index = () => {
               <p className="text-muted-foreground mt-1">מערכת ניהול אבחונים פסיכולוגיים חינוכיים-דידקטיים</p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" size="sm">
-                <Users className="h-4 w-4 ml-2" />
-                ילד חדש
-              </Button>
-              <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
-                <Plus className="h-4 w-4 ml-2" />
-                אבחון חדש
-              </Button>
+              <Link to="/children">
+                <Button variant="outline" size="sm">
+                  <Users className="h-4 w-4 ml-2" />
+                  ילד חדש
+                </Button>
+              </Link>
+              <Link to="/children">
+                <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
+                  <Plus className="h-4 w-4 ml-2" />
+                  אבחון חדש
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -127,16 +167,16 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {allAssessments.map((assessment) => (
+              {assessments.map((assessment) => (
                 <div key={assessment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h4 className="font-medium text-foreground">{assessment.childName}</h4>
+                      <h4 className="font-medium text-foreground">{assessment.child_name}</h4>
                       {getStatusBadge(assessment.status)}
                     </div>
                     <div className="flex gap-4 text-sm text-muted-foreground mt-2">
-                      <span>נוצר: {new Date(assessment.createdAt).toLocaleDateString('he-IL')}</span>
-                      <span>עודכן לאחרונה: {new Date(assessment.lastUpdated).toLocaleDateString('he-IL')}</span>
+                      <span>נוצר: {new Date(assessment.created_at).toLocaleDateString('he-IL')}</span>
+                      <span>עודכן לאחרונה: {new Date(assessment.updated_at).toLocaleDateString('he-IL')}</span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -154,7 +194,7 @@ const Index = () => {
               ))}
             </div>
 
-            {allAssessments.length === 0 && (
+            {assessments.length === 0 && (
               <div className="text-center py-12">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-foreground mb-2">אין אבחונים עדיין</h3>

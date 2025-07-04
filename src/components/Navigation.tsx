@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Home, 
   Users, 
@@ -9,12 +11,23 @@ import {
   BarChart3, 
   Settings, 
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "התנתקות",
+      description: "התנתקת בהצלחה מהמערכת",
+    });
+  };
 
   const navigationItems = [
     { path: "/", label: "דף הבית", icon: Home },
@@ -59,14 +72,20 @@ const Navigation = () => {
                 >
                   <Icon className="h-4 w-4 ml-2" />
                   {item.label}
-                  {item.path === "/" && (
-                    <Badge variant="secondary" className="mr-2">
-                      3
-                    </Badge>
-                  )}
                 </Link>
               );
             })}
+            
+            {/* User section */}
+            <div className="flex items-center space-x-4 border-r pr-4" dir="rtl">
+              <span className="text-sm text-muted-foreground">
+                {user?.email}
+              </span>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 ml-2" />
+                התנתק
+              </Button>
+            </div>
           </div>
 
           {/* Mobile menu button */}

@@ -9,7 +9,142 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      assessments: {
+        Row: {
+          assessment_data: Json | null
+          child_id: string
+          child_name: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["assessment_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assessment_data?: Json | null
+          child_id: string
+          child_name: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["assessment_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assessment_data?: Json | null
+          child_id?: string
+          child_name?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["assessment_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      children: {
+        Row: {
+          created_at: string
+          date_of_birth: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_of_birth: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_of_birth?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          assessment_id: string
+          child_name: string
+          generated_at: string
+          id: string
+          report_content: string | null
+          user_id: string
+        }
+        Insert: {
+          assessment_id: string
+          child_name: string
+          generated_at?: string
+          id?: string
+          report_content?: string | null
+          user_id: string
+        }
+        Update: {
+          assessment_id?: string
+          child_name?: string
+          generated_at?: string
+          id?: string
+          report_content?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +153,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      assessment_status: "draft" | "in-progress" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +268,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      assessment_status: ["draft", "in-progress", "completed"],
+    },
   },
 } as const
