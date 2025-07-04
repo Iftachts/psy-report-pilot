@@ -42,6 +42,7 @@ const AppContent = () => (
           <Route path="/" element={<Index />} />
           <Route path="/children" element={<Children />} />
           <Route path="/assessment" element={<AssessmentForm />} />
+          <Route path="/assessment/:id" element={<AssessmentForm />} />
           <Route path="/reports" element={<ReportGenerator />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

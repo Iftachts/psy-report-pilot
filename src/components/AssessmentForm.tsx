@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +70,7 @@ const commonRecommendations = [
 
 const AssessmentForm = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const [scores, setScores] = useState<Score[]>([]);
@@ -98,8 +99,11 @@ const AssessmentForm = () => {
   useEffect(() => {
     if (user) {
       fetchChildren();
+      if (id) {
+        loadAssessment(id);
+      }
     }
-  }, [user]);
+  }, [user, id]);
 
   const fetchChildren = async () => {
     try {
@@ -114,6 +118,44 @@ const AssessmentForm = () => {
       toast({
         title: "שגיאה",
         description: "אירעה שגיאה בטעינת רשימת הילדים",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadAssessment = async (assessmentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('assessments')
+        .select('*')
+        .eq('id', assessmentId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setAssessmentId(data.id);
+        setSelectedChild(data.child_id);
+        
+        if (data.assessment_data && typeof data.assessment_data === 'string') {
+          const assessmentData = JSON.parse(data.assessment_data);
+          setScores(assessmentData.scores || []);
+          setObservations(assessmentData.observations || []);
+          
+          if (assessmentData.recommendations) {
+            setRecommendations(prev => 
+              prev.map(rec => ({
+                ...rec,
+                selected: assessmentData.recommendations.some((r: any) => r.id === rec.id)
+              }))
+            );
+          }
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת האבחון",
         variant: "destructive",
       });
     }

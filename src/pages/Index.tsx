@@ -180,7 +180,7 @@ const Index = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Link to="/assessment">
+                    <Link to={`/assessment/${assessment.id}`}>
                       <Button variant="outline" size="sm">
                         עריכה
                       </Button>
