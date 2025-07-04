@@ -601,17 +601,12 @@ const AssessmentForm = () => {
                   בחר יכולת CHC עבור כל מבחן שהזנת בטאב "ציוני אבחון"
                 </CardDescription>
               </CardHeader>
-            <CardContent>
-              {scores.length === 0 ? (
-                <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed border-muted-foreground/20">
-                  <div className="text-lg font-medium text-foreground mb-2">
-                    אין מבחנים עדיין
+              <CardContent>
+                {scores.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    אין מבחנים עדיין. עבור לטאב "ציוני אבחון" כדי להוסיף מבחנים תחילה.
                   </div>
-                  <p className="text-muted-foreground">
-                    עבור לטאב "ציוני אבחון" כדי להוסיף מבחנים תחילה
-                  </p>
-                </div>
-              ) : (
+                ) : (
                   <div className="space-y-4">
                     {scores.map((score) => (
                       <div key={score.id} className="p-4 border rounded-lg">
