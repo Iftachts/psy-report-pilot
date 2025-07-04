@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Save, FileText, Clock, Check } from "lucide-react";
+import { Plus, Save, FileText, Clock, Check, X } from "lucide-react";
 
 interface Score {
   id: string;
@@ -51,6 +51,19 @@ interface XBATest {
   subtest: string;
   standardScore: number;
   notes: string;
+  sourceScoreId?: string; // Reference to original score if selected from existing tests
+}
+
+interface CHCPassage {
+  abilityId: string;
+  selectedSentences: string[];
+  customText?: string;
+}
+
+interface SentenceOption {
+  id: string;
+  text: string;
+  category: 'strength' | 'weakness' | 'average' | 'observation';
 }
 
 const diagnosticTools = [
@@ -151,6 +164,149 @@ const chcAbilities: CHCAbility[] = [
   }
 ];
 
+// Sentence bank for CHC ability passages
+const chcSentenceBanks: Record<string, SentenceOption[]> = {
+  gf: [ // Fluid Intelligence
+    { id: "gf_s1", text: "הילד מפגין יכולת מעולה בפתרון בעיות חדשות ולא מוכרות", category: "strength" },
+    { id: "gf_s2", text: "מפגין גמישות קוגניטיביות בגישה לבעיות מורכבות", category: "strength" },
+    { id: "gf_s3", text: "מסוגל לזהות דפוסים והקבלות בצורה מהירה ויעילה", category: "strength" },
+    { id: "gf_s4", text: "מפגין יכולת חשיבה אבסטרקטית ברמה גבוהה", category: "strength" },
+    { id: "gf_w1", text: "מתקשה בפתרון בעיות הדורשות חשיבה מופשטת", category: "weakness" },
+    { id: "gf_w2", text: "נדרש זמן רב לזיהוי דפוסים והקבלות", category: "weakness" },
+    { id: "gf_w3", text: "מתקשה בהכללה ויישום עקרונות על מצבים חדשים", category: "weakness" },
+    { id: "gf_w4", text: "מפגין קשיחות קוגניטיבית בגישה לבעיות", category: "weakness" },
+    { id: "gf_a1", text: "מפגין יכולות חשיבה נוזלית ברמה ממוצעת לגילו", category: "average" },
+    { id: "gf_a2", text: "מסוגל לפתור בעיות בסיסיות הדורשות הנמקה לוגית", category: "average" },
+    { id: "gf_o1", text: "נמצא מרוכז ומתמיד במהלך ביצוע משימות הדורשות חשיבה", category: "observation" },
+    { id: "gf_o2", text: "מפגין סקרנות ומעוניין לחקור פתרונות חלופיים", category: "observation" }
+  ],
+  gc: [ // Crystallized Intelligence
+    { id: "gc_s1", text: "הילד מפגין אוצר מילים עשיר ומגוון", category: "strength" },
+    { id: "gc_s2", text: "מפגין ידע כללי רחב ומעמיק בתחומים שונים", category: "strength" },
+    { id: "gc_s3", text: "מסוגל להסביר מושגים מורכבים בבהירות", category: "strength" },
+    { id: "gc_s4", text: "מפגין הבנה מעמיקה של קשרים סיבתיים", category: "strength" },
+    { id: "gc_w1", text: "מפגין אוצר מילים מוגבל לגילו", category: "weakness" },
+    { id: "gc_w2", text: "מתקשה בהבנת מושגים מופשטים", category: "weakness" },
+    { id: "gc_w3", text: "מפגין חוסר בידע כללי בתחומים שונים", category: "weakness" },
+    { id: "gc_w4", text: "מתקשה בהסבר והבעה מילולית של רעיונות", category: "weakness" },
+    { id: "gc_a1", text: "מפגין ידע מילולי ברמה ממוצעת לגילו", category: "average" },
+    { id: "gc_a2", text: "מסוגל להבין ולהשתמש במילים בהקשר מתאים", category: "average" },
+    { id: "gc_o1", text: "מפגין עניין בלמידה ורכישת ידע חדש", category: "observation" },
+    { id: "gc_o2", text: "משתמש בשפה בצורה מדויקת ומתאימה", category: "observation" }
+  ],
+  gv: [ // Visual Processing
+    { id: "gv_s1", text: "הילד מפגין יכולות עיבוד חזותי מעולות", category: "strength" },
+    { id: "gv_s2", text: "מסוגל לזהות פרטים חזותיים דקים במהירות", category: "strength" },
+    { id: "gv_s3", text: "מפגין יכולת מרחבית מפותחת", category: "strength" },
+    { id: "gv_s4", text: "מצליח במשימות הדורשות ויזואליזציה מנטלית", category: "strength" },
+    { id: "gv_w1", text: "מתקשה בעיבוד מידע חזותי מורכב", category: "weakness" },
+    { id: "gv_w2", text: "מפגין קשיים באוריינטציה מרחבית", category: "weakness" },
+    { id: "gv_w3", text: "מתקשה בזיהוי קשרים חזותיים", category: "weakness" },
+    { id: "gv_w4", text: "נדרש זמן רב לעיבוד מידע ויזואלי", category: "weakness" },
+    { id: "gv_a1", text: "מפגין יכולות עיבוד חזותי ברמה ממוצעת", category: "average" },
+    { id: "gv_a2", text: "מסוגל לבצע משימות חזותיות בסיסיות", category: "average" },
+    { id: "gv_o1", text: "מתרכז היטב במשימות חזותיות", category: "observation" },
+    { id: "gv_o2", text: "מפגין דיוק בביצוע משימות הדורשות תשומת לב לפרטים", category: "observation" }
+  ],
+  ga: [ // Auditory Processing
+    { id: "ga_s1", text: "הילד מפגין יכולות עיבוד שמיעתי מעולות", category: "strength" },
+    { id: "ga_s2", text: "מסוגל להבחין בין צלילים דומים בקלות", category: "strength" },
+    { id: "ga_s3", text: "מפגין זיכרון שמיעתי חזק", category: "strength" },
+    { id: "ga_s4", text: "מצליח בעיבוד מידע שמיעתי מורכב", category: "strength" },
+    { id: "ga_w1", text: "מתקשה בעיבוד מידע שמיעתי", category: "weakness" },
+    { id: "ga_w2", text: "מפגין קשיים בהבחנה בין צלילים", category: "weakness" },
+    { id: "ga_w3", text: "נדרש חזרה על הוראות שמיעתיות", category: "weakness" },
+    { id: "ga_w4", text: "מתקשה בסביבה רועשת", category: "weakness" },
+    { id: "ga_a1", text: "מפגין יכולות עיבוד שמיעתי ברמה ממוצעת", category: "average" },
+    { id: "ga_a2", text: "מסוגל לעבד מידע שמיעתי פשוט", category: "average" },
+    { id: "ga_o1", text: "מקשיב בתשומת לב להוראות", category: "observation" },
+    { id: "ga_o2", text: "מגיב בצורה מתאימה לגירויים שמיעתיים", category: "observation" }
+  ],
+  gs: [ // Processing Speed
+    { id: "gs_s1", text: "הילד מפגין מהירות עיבוד מעולה", category: "strength" },
+    { id: "gs_s2", text: "מבצע משימות אוטומטיות במהירות רבה", category: "strength" },
+    { id: "gs_s3", text: "מפגין יעילות גבוהה במשימות זמן", category: "strength" },
+    { id: "gs_s4", text: "מסוגל לעבד מידע בקצב מהיר", category: "strength" },
+    { id: "gs_w1", text: "מפגין מהירות עיבוד איטית", category: "weakness" },
+    { id: "gs_w2", text: "נדרש זמן רב להשלמת משימות", category: "weakness" },
+    { id: "gs_w3", text: "מתקשה במשימות הדורשות מהירות", category: "weakness" },
+    { id: "gs_w4", text: "מפגין איטיות בעיבוד מידע אוטומטי", category: "weakness" },
+    { id: "gs_a1", text: "מפגין מהירות עיבוד ברמה ממוצעת", category: "average" },
+    { id: "gs_a2", text: "מסוגל לבצע משימות בקצב סביר", category: "average" },
+    { id: "gs_o1", text: "עובד בקצב יציב ועקבי", category: "observation" },
+    { id: "gs_o2", text: "מפגין סבלנות במשימות ארוכות", category: "observation" }
+  ],
+  gsm: [ // Short-term Memory
+    { id: "gsm_s1", text: "הילד מפגין זיכרון עבודה מעולה", category: "strength" },
+    { id: "gsm_s2", text: "מסוגל לזכור רצפים ארוכים של מידע", category: "strength" },
+    { id: "gsm_s3", text: "מפגין יכולת לתפעל מידע בזיכרון", category: "strength" },
+    { id: "gsm_s4", text: "מצליח במשימות הדורשות זיכרון קצר מדי", category: "strength" },
+    { id: "gsm_w1", text: "מפגין קשיים בזיכרון קצר מדי", category: "weakness" },
+    { id: "gsm_w2", text: "מתקשה לזכור הוראות מורכבות", category: "weakness" },
+    { id: "gsm_w3", text: "נדרש חזרות לזכירת מידע", category: "weakness" },
+    { id: "gsm_w4", text: "מתקשה לתפעל מידע בזיכרון", category: "weakness" },
+    { id: "gsm_a1", text: "מפגין יכולות זיכרון עבודה ברמה ממוצעת", category: "average" },
+    { id: "gsm_a2", text: "מסוגל לזכור מידע פשוט לזמן קצר", category: "average" },
+    { id: "gsm_o1", text: "מתרכז במשימות הדורשות זיכרון", category: "observation" },
+    { id: "gsm_o2", text: "משתמש באסטרטגיות זכירה", category: "observation" }
+  ],
+  glr: [ // Long-term Retrieval
+    { id: "glr_s1", text: "הילד מפגין יכולת שליפה מעולה מהזיכרון", category: "strength" },
+    { id: "glr_s2", text: "מסוגל לזכור מידע שנלמד בעבר", category: "strength" },
+    { id: "glr_s3", text: "מפגין זיכרון אסוציאטיבי חזק", category: "strength" },
+    { id: "glr_s4", text: "מצליח בלמידה ושמירה לטווח ארוך", category: "strength" },
+    { id: "glr_w1", text: "מתקשה בשליפת מידע מהזיכרון", category: "weakness" },
+    { id: "glr_w2", text: "מפגין קשיים בזכירת מידע שנלמד", category: "weakness" },
+    { id: "glr_w3", text: "נדרש תזכורות לשליפת מידע", category: "weakness" },
+    { id: "glr_w4", text: "מתקשה ביצירת קשרים בזיכרון", category: "weakness" },
+    { id: "glr_a1", text: "מפגין יכולות שליפה ברמה ממוצעת", category: "average" },
+    { id: "glr_a2", text: "מסוגל לזכור מידע בסיסי", category: "average" },
+    { id: "glr_o1", text: "מפגין מאמץ בשליפת מידע", category: "observation" },
+    { id: "glr_o2", text: "משתמש ברמזים לעזרה בזכירה", category: "observation" }
+  ],
+  gq: [ // Quantitative Knowledge
+    { id: "gq_s1", text: "הילד מפגין יכולות מתמטיות מעולות", category: "strength" },
+    { id: "gq_s2", text: "מסוגל לפתור בעיות מתמטיות מורכבות", category: "strength" },
+    { id: "gq_s3", text: "מפגין הבנה מעמיקה של מושגים מתמטיים", category: "strength" },
+    { id: "gq_s4", text: "מצליח בחשיבה כמותית ולוגית", category: "strength" },
+    { id: "gq_w1", text: "מתקשה בפתרון בעיות מתמטיות", category: "weakness" },
+    { id: "gq_w2", text: "מפגין קשיים בהבנת מושגים כמותיים", category: "weakness" },
+    { id: "gq_w3", text: "נדרש עזרה בחישובים בסיסיים", category: "weakness" },
+    { id: "gq_w4", text: "מתקשה ביישום כללים מתמטיים", category: "weakness" },
+    { id: "gq_a1", text: "מפגין יכולות מתמטיות ברמה ממוצעת", category: "average" },
+    { id: "gq_a2", text: "מסוגל לבצע חישובים בסיסיים", category: "average" },
+    { id: "gq_o1", text: "מפגין מתמדה במשימות מתמטיות", category: "observation" },
+    { id: "gq_o2", text: "מנסה גישות שונות לפתרון בעיות", category: "observation" }
+  ],
+  grw: [ // Reading/Writing
+    { id: "grw_s1", text: "הילד מפגין כישורי קריאה וכתיבה מעולים", category: "strength" },
+    { id: "grw_s2", text: "מסוגל לקרוא טקסטים מורכבים בהבנה", category: "strength" },
+    { id: "grw_s3", text: "מפגין כישורי כתיבה מפותחים", category: "strength" },
+    { id: "grw_s4", text: "מצליח במשימות הדורשות הבנת הנקרא", category: "strength" },
+    { id: "grw_w1", text: "מתקשה בקריאה שוטפת", category: "weakness" },
+    { id: "grw_w2", text: "מפגין קשיים בהבנת הנקרא", category: "weakness" },
+    { id: "grw_w3", text: "נדרש עזרה בכתיבה", category: "weakness" },
+    { id: "grw_w4", text: "מתקשה בפענוח מילים", category: "weakness" },
+    { id: "grw_a1", text: "מפגין כישורי קריאה וכתיבה ברמה ממוצעת", category: "average" },
+    { id: "grw_a2", text: "מסוגל לקרוא טקסטים פשוטים", category: "average" },
+    { id: "grw_o1", text: "מפגין עניין בקריאה", category: "observation" },
+    { id: "grw_o2", text: "עובד בהתמדה על שיפור הכתיבה", category: "observation" }
+  ]
+};
+
+// Example passages for each CHC ability
+const examplePassages: Record<string, string> = {
+  gf: "הילד מפגין יכולת מעולה בפתרון בעיות חדשות ולא מוכרות. מפגין גמישות קוגניטיביות בגישה לבעיות מורכבות ומסוגל לזהות דפוסים והקבלות בצורה מהירה ויעילה. נמצא מרוכז ומתמיד במהלך ביצוע משימות הדורשות חשיבה.",
+  gc: "הילד מפגין אוצר מילים עשיר ומגוון ומסוגל להסביר מושגים מורכבים בבהירות. מפגין ידע כללי רחב ומעמיק בתחומים שונים ומפגין עניין בלמידה ורכישת ידע חדש.",
+  gv: "הילד מפגין יכולות עיבוד חזותי מעולות ומסוגל לזהות פרטים חזותיים דקים במהירות. מפגין יכולת מרחבית מפותחת ומתרכז היטב במשימות חזותיות.",
+  ga: "הילד מפגין יכולות עיבוד שמיעתי מעולות ומסוגל להבחין בין צלילים דומים בקלות. מקשיב בתשומת לב להוראות ומגיב בצורה מתאימה לגירויים שמיעתיים.",
+  gs: "הילד מפגין מהירות עיבוד מעולה ומבצע משימות אוטומטיות במהירות רבה. עובד בקצב יציב ועקבי ומפגין יעילות גבוהה במשימות זמן.",
+  gsm: "הילד מפגין זיכרון עבודה מעולה ומסוגל לזכור רצפים ארוכים של מידע. מתרכז במשימות הדורשות זיכרון ומשתמש באסטרטגיות זכירה.",
+  glr: "הילד מפגין יכולת שליפה מעולה מהזיכרון ומסוגל לזכור מידע שנלמד בעבר. מפגין זיכרון אסוציאטיבי חזק ומפגין מאמץ בשליפת מידע.",
+  gq: "הילד מפגין יכולות מתמטיות מעולות ומסוגל לפתור בעיות מתמטיות מורכבות. מפגין הבנה מעמיקה של מושגים מתמטיים ומפגין מתמדה במשימות מתמטיות.",
+  grw: "הילד מפגין כישורי קריאה וכתיבה מעולים ומסוגל לקרוא טקסטים מורכבים בהבנה. מפגין כישורי כתיבה מפותחים ומפגין עניין בקריאה."
+};
+
 
 const AssessmentForm = () => {
   const navigate = useNavigate();
@@ -193,6 +349,10 @@ const AssessmentForm = () => {
     standardScore: "",
     notes: ""
   });
+  const [xbaMode, setXbaMode] = useState<'new' | 'existing'>('existing'); // Default to existing tests
+  const [selectedExistingScore, setSelectedExistingScore] = useState<string>("");
+  const [chcPassages, setChcPassages] = useState<CHCPassage[]>([]);
+  const [activePassageAbility, setActivePassageAbility] = useState<string>("");
 
   useEffect(() => {
     if (user) {
@@ -239,6 +399,8 @@ const AssessmentForm = () => {
           const assessmentData = JSON.parse(data.assessment_data);
           setScores(assessmentData.scores || []);
           setObservations(assessmentData.observations || []);
+          setXbaTests(assessmentData.xbaTests || []);
+          setChcPassages(assessmentData.chcPassages || []);
           
           if (assessmentData.recommendations) {
             setRecommendations(prev => 
@@ -276,6 +438,8 @@ const AssessmentForm = () => {
         scores,
         observations,
         recommendations: recommendations.filter(r => r.selected),
+        xbaTests,
+        chcPassages,
         savedAt: new Date().toISOString()
       });
 
@@ -439,6 +603,55 @@ const AssessmentForm = () => {
   };
 
   const addXbaTest = () => {
+    if (xbaMode === 'existing') {
+      addExistingTestToXBA();
+    } else {
+      addNewTestToXBA();
+    }
+  };
+
+  const addExistingTestToXBA = () => {
+    if (!newXbaTest.abilityId || !selectedExistingScore) return;
+    
+    const selectedScore = scores.find(score => score.id === selectedExistingScore);
+    if (!selectedScore) return;
+
+    // Check if this test is already assigned to this CHC ability
+    const existingAssignment = xbaTests.find(test => 
+      test.sourceScoreId === selectedScore.id && test.abilityId === newXbaTest.abilityId
+    );
+    
+    if (existingAssignment) {
+      toast({
+        title: "מבחן כבר קיים",
+        description: "המבחן כבר מוקצה ליכולת CHC זו",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const xbaTest: XBATest = {
+      id: Date.now().toString(),
+      abilityId: newXbaTest.abilityId,
+      testName: selectedScore.tool,
+      subtest: selectedScore.subtest,
+      standardScore: selectedScore.standardScore,
+      notes: selectedScore.notes || newXbaTest.notes,
+      sourceScoreId: selectedScore.id
+    };
+
+    setXbaTests([...xbaTests, xbaTest]);
+    setNewXbaTest({
+      abilityId: "",
+      testName: "",
+      subtest: "",
+      standardScore: "",
+      notes: ""
+    });
+    setSelectedExistingScore("");
+  };
+
+  const addNewTestToXBA = () => {
     if (!newXbaTest.abilityId || !newXbaTest.testName || !newXbaTest.standardScore) return;
     
     const scoreValue = parseFloat(newXbaTest.standardScore);
@@ -474,6 +687,67 @@ const AssessmentForm = () => {
 
   const getTestsByAbility = (abilityId: string) => 
     xbaTests.filter(test => test.abilityId === abilityId);
+
+  const getAvailableScores = () => {
+    // Return all scores - allow tests to be assigned to multiple CHC abilities
+    return scores;
+  };
+
+  const removeXbaTest = (testId: string) => {
+    setXbaTests(xbaTests.filter(test => test.id !== testId));
+  };
+
+  const getTestAssignmentCount = (scoreId: string) => {
+    return xbaTests.filter(test => test.sourceScoreId === scoreId).length;
+  };
+
+  const getPassageForAbility = (abilityId: string): CHCPassage => {
+    return chcPassages.find(p => p.abilityId === abilityId) || {
+      abilityId,
+      selectedSentences: [],
+      customText: ""
+    };
+  };
+
+  const updatePassage = (abilityId: string, updatedPassage: Partial<CHCPassage>) => {
+    setChcPassages(prev => {
+      const existingIndex = prev.findIndex(p => p.abilityId === abilityId);
+      const newPassage = { abilityId, ...getPassageForAbility(abilityId), ...updatedPassage };
+      
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newPassage;
+        return updated;
+      } else {
+        return [...prev, newPassage];
+      }
+    });
+  };
+
+  const toggleSentence = (abilityId: string, sentenceId: string) => {
+    const passage = getPassageForAbility(abilityId);
+    const isSelected = passage.selectedSentences.includes(sentenceId);
+    
+    const newSelectedSentences = isSelected
+      ? passage.selectedSentences.filter(id => id !== sentenceId)
+      : [...passage.selectedSentences, sentenceId];
+    
+    updatePassage(abilityId, { selectedSentences: newSelectedSentences });
+  };
+
+  const generatePassageText = (abilityId: string): string => {
+    const passage = getPassageForAbility(abilityId);
+    const sentences = passage.selectedSentences
+      .map(id => chcSentenceBanks[abilityId]?.find(s => s.id === id)?.text)
+      .filter(Boolean);
+    
+    let text = sentences.join('. ');
+    if (text && !text.endsWith('.')) text += '.';
+    if (passage.customText) {
+      text = text ? `${text} ${passage.customText}` : passage.customText;
+    }
+    return text;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 p-6" dir="rtl">
@@ -634,10 +908,28 @@ const AssessmentForm = () => {
               <CardHeader>
                 <CardTitle>ניתוח XBA - יכולות CHC</CardTitle>
                 <CardDescription>
-                  בחר יכולת CHC והוסף מבחנים הרלוונטיים אליה
+                  בחר יכולת CHC והוסף מבחנים הרלוונטיים אליה - ניתן לבחור מבחנים קיימים או להוסיף חדשים
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Mode Selection */}
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    variant={xbaMode === 'existing' ? 'default' : 'outline'}
+                    onClick={() => setXbaMode('existing')}
+                    className="flex-1"
+                  >
+                    בחר מבחן קיים
+                  </Button>
+                  <Button
+                    variant={xbaMode === 'new' ? 'default' : 'outline'}
+                    onClick={() => setXbaMode('new')}
+                    className="flex-1"
+                  >
+                    הוסף מבחן חדש
+                  </Button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="chc-ability">יכולת CHC</Label>
@@ -655,37 +947,63 @@ const AssessmentForm = () => {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="test-name">שם המבחן</Label>
-                    <Input
-                      id="test-name"
-                      value={newXbaTest.testName}
-                      onChange={(e) => setNewXbaTest({...newXbaTest, testName: e.target.value})}
-                      placeholder="שם המבחן"
-                    />
-                  </div>
+                  {xbaMode === 'existing' ? (
+                    <div>
+                      <Label htmlFor="existing-test">בחר מבחן קיים</Label>
+                      <Select value={selectedExistingScore} onValueChange={setSelectedExistingScore}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="בחר מבחן מהרשימה" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getAvailableScores().map((score) => {
+                            const assignmentCount = getTestAssignmentCount(score.id);
+                            return (
+                              <SelectItem key={score.id} value={score.id}>
+                                {score.tool} - {score.subtest} (ציון: {score.standardScore})
+                                {assignmentCount > 0 && ` - מוקצה ל-${assignmentCount} יכולות`}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <Label htmlFor="test-name">שם המבחן</Label>
+                        <Input
+                          id="test-name"
+                          value={newXbaTest.testName}
+                          onChange={(e) => setNewXbaTest({...newXbaTest, testName: e.target.value})}
+                          placeholder="שם המבחן"
+                        />
+                      </div>
 
-                  <div>
-                    <Label htmlFor="xba-score">ציון סטנדרטי</Label>
-                    <Input
-                      id="xba-score"
-                      type="number"
-                      value={newXbaTest.standardScore}
-                      onChange={(e) => setNewXbaTest({...newXbaTest, standardScore: e.target.value})}
-                      placeholder="40-160"
-                    />
-                  </div>
+                      <div>
+                        <Label htmlFor="xba-score">ציון סטנדרטי</Label>
+                        <Input
+                          id="xba-score"
+                          type="number"
+                          value={newXbaTest.standardScore}
+                          onChange={(e) => setNewXbaTest({...newXbaTest, standardScore: e.target.value})}
+                          placeholder="40-160"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <div>
-                  <Label htmlFor="xba-subtest">תת-מבחן</Label>
-                  <Input
-                    id="xba-subtest"
-                    value={newXbaTest.subtest}
-                    onChange={(e) => setNewXbaTest({...newXbaTest, subtest: e.target.value})}
-                    placeholder="שם התת-מבחן (אופציונלי)"
-                  />
-                </div>
+                {xbaMode === 'new' && (
+                  <div>
+                    <Label htmlFor="xba-subtest">תת-מבחן</Label>
+                    <Input
+                      id="xba-subtest"
+                      value={newXbaTest.subtest}
+                      onChange={(e) => setNewXbaTest({...newXbaTest, subtest: e.target.value})}
+                      placeholder="שם התת-מבחן (אופציונלי)"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="xba-notes">הערות</Label>
@@ -700,36 +1018,99 @@ const AssessmentForm = () => {
 
                 <Button onClick={addXbaTest} className="w-full">
                   <Plus className="h-4 w-4 ml-2" />
-                  הוסף מבחן ליכולת CHC
+                  {xbaMode === 'existing' ? 'הוסף מבחן קיים ליכולת CHC' : 'הוסף מבחן חדש ליכולת CHC'}
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Show available tests count */}
+            {xbaMode === 'existing' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">מבחנים זמינים</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    יש לך {getAvailableScores().length} מבחנים זמינים. מבחנים יכולים להיות מוקצים למספר יכולות CHC.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* CHC Abilities Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {chcAbilities.map((ability) => {
                 const abilityTests = getTestsByAbility(ability.id);
+                const passage = getPassageForAbility(ability.id);
+                const passageText = generatePassageText(ability.id);
+                
                 return (
                   <Card key={ability.id} className={abilityTests.length > 0 ? "border-primary" : ""}>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center justify-between">
                         <span>{ability.code} - {ability.hebrewName}</span>
-                        {abilityTests.length > 0 && (
-                          <Badge variant="secondary">{abilityTests.length}</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {abilityTests.length > 0 && (
+                            <Badge variant="secondary">{abilityTests.length}</Badge>
+                          )}
+                          {passage.selectedSentences.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              פסקה: {passage.selectedSentences.length}
+                            </Badge>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setActivePassageAbility(ability.id)}
+                            className="h-6 px-2 text-xs"
+                          >
+                            יצור פסקה
+                          </Button>
+                        </div>
                       </CardTitle>
                       <CardDescription className="text-sm">
                         {ability.description}
                       </CardDescription>
                     </CardHeader>
+                    
+                    {/* Show generated passage if exists */}
+                    {passageText && (
+                      <CardContent className="pt-0">
+                        <div className="p-3 bg-blue-50 rounded-md border border-blue-200">
+                          <p className="text-sm font-medium text-blue-900 mb-1">פסקה שנוצרה:</p>
+                          <p className="text-sm text-blue-800">{passageText}</p>
+                        </div>
+                      </CardContent>
+                    )}
+                    
+                    {/* Show tests if any */}
                     {abilityTests.length > 0 && (
-                      <CardContent>
+                      <CardContent className={passageText ? "pt-0" : ""}>
                         <div className="space-y-2">
+                          <p className="text-sm font-medium">מבחנים מוקצים:</p>
                           {abilityTests.map((test) => (
                             <div key={test.id} className="p-2 bg-muted/50 rounded text-sm">
-                              <div className="font-medium">{test.testName}</div>
+                              <div className="font-medium flex items-center justify-between">
+                                <span>{test.testName}</span>
+                                <div className="flex items-center gap-2">
+                                  {test.sourceScoreId && (
+                                    <Badge variant="outline" className="text-xs">
+                                      קיים
+                                    </Badge>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeXbaTest(test.id)}
+                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
                               {test.subtest && <div className="text-muted-foreground">{test.subtest}</div>}
                               <div className="text-primary font-bold">ציון: {test.standardScore}</div>
+                              {test.notes && <div className="text-xs text-muted-foreground mt-1">{test.notes}</div>}
                             </div>
                           ))}
                         </div>
@@ -739,6 +1120,108 @@ const AssessmentForm = () => {
                 );
               })}
             </div>
+
+            {/* Passage Builder Modal/Dialog */}
+            {activePassageAbility && (
+              <Card className="mt-6 border-primary">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>
+                      יצירת פסקה עבור {chcAbilities.find(a => a.id === activePassageAbility)?.hebrewName}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActivePassageAbility("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>
+                    בחר משפטים מוכנים או הוסף טקסט מותאם אישית ליצירת פסקה מקצועית
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Example Passage */}
+                  <div>
+                    <Label className="text-sm font-medium">דוגמה לפסקה:</Label>
+                    <div className="mt-2 p-3 bg-muted rounded-md">
+                      <p className="text-sm">{examplePassages[activePassageAbility]}</p>
+                    </div>
+                  </div>
+
+                  {/* Sentence Categories */}
+                  {['strength', 'weakness', 'average', 'observation'].map((category) => {
+                    const categoryName = {
+                      strength: 'נקודות חוזק',
+                      weakness: 'נקודות חולשה', 
+                      average: 'ביצוע ממוצע',
+                      observation: 'תצפיות כלליות'
+                    }[category];
+
+                    const sentences = chcSentenceBanks[activePassageAbility]?.filter(s => s.category === category) || [];
+                    const passage = getPassageForAbility(activePassageAbility);
+
+                    return (
+                      <div key={category}>
+                        <Label className="text-sm font-medium">{categoryName}</Label>
+                        <div className="mt-2 space-y-2">
+                          {sentences.map((sentence) => {
+                            const isSelected = passage.selectedSentences.includes(sentence.id);
+                            return (
+                              <div
+                                key={sentence.id}
+                                className={`p-3 rounded-md border cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-primary/10 border-primary text-primary' 
+                                    : 'bg-background border-border hover:bg-muted'
+                                }`}
+                                onClick={() => toggleSentence(activePassageAbility, sentence.id)}
+                              >
+                                <p className="text-sm">{sentence.text}</p>
+                                {isSelected && (
+                                  <Check className="h-4 w-4 mt-2 text-primary" />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Custom Text */}
+                  <div>
+                    <Label htmlFor="custom-text">טקסט מותאם אישית</Label>
+                    <Textarea
+                      id="custom-text"
+                      placeholder="הוסף טקסט נוסף או מותאם אישית..."
+                      value={getPassageForAbility(activePassageAbility).customText || ""}
+                      onChange={(e) => updatePassage(activePassageAbility, { customText: e.target.value })}
+                      rows={3}
+                      className="mt-2"
+                    />
+                  </div>
+
+                  {/* Generated Passage Preview */}
+                  <div>
+                    <Label className="text-sm font-medium">תצוגה מקדימה של הפסקה:</Label>
+                    <div className="mt-2 p-4 bg-blue-50 rounded-md border border-blue-200">
+                      <p className="text-sm">
+                        {generatePassageText(activePassageAbility) || "בחר משפטים ליצירת הפסקה"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={() => setActivePassageAbility("")}
+                    className="w-full"
+                  >
+                    סיים עריכת פסקה
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Observations Tab */}
